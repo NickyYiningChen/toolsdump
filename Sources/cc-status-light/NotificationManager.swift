@@ -95,21 +95,18 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func openInApp(cwd: String) {
-        // Default app names to try, in order
-        let names: [String]
+        // Bundle IDs to try, in priority order
+        let bundleIDs: [String]
         if !returnApp.isEmpty {
-            names = [returnApp]
+            bundleIDs = [returnApp]
         } else {
-            names = ["Visual Studio Code", "Terminal", "iTerm"]
+            bundleIDs = ["com.apple.Terminal", "com.microsoft.VSCode", "com.googlecode.iterm2"]
         }
 
-        for name in names {
-            let task = Process()
-            task.launchPath = "/usr/bin/open"
-            task.arguments = ["-a", name]
-            task.launch()
-            task.waitUntilExit()
-            if task.terminationStatus == 0 { return }
+        for bid in bundleIDs {
+            guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bid).first else { continue }
+            app.activate(options: .activateIgnoringOtherApps)
+            return
         }
     }
 
