@@ -79,7 +79,7 @@ struct LightCircle: View {
                 }
             }
         }
-        .onChange(of: isActive) { newValue in
+        .onChange(of: isActive, initial: false) { _, newValue in
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 breathe = newValue
             }
