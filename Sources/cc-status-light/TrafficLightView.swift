@@ -6,7 +6,7 @@ struct TrafficLightView: View {
     @ObservedObject var stateManager: StateManager
 
     var body: some View {
-        VStack(spacing: 8) {
+        HStack(spacing: 8) {
             LightCircle(color: .red,    isActive: stateManager.currentState == .busy)
             LightCircle(color: .yellow, isActive: stateManager.currentState == .waiting)
             LightCircle(color: .green,  isActive: stateManager.currentState == .idle)
@@ -20,7 +20,6 @@ struct TrafficLightView: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
-        .frame(width: 44)
         .contextMenu {
             Button("Mute Notifications") {
                 NotificationCenter.default.post(name: .toggleMute, object: nil)

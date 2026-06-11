@@ -3,8 +3,8 @@ import SwiftUI
 
 class FloatingWindowController: NSWindowController {
 
-    private let defaultWidth: CGFloat = 44
-    private let defaultHeight: CGFloat = 130
+    private let defaultWidth: CGFloat = 130
+    private let defaultHeight: CGFloat = 44
 
     init<V: View>(contentView: V) {
         let hostingView = NSHostingView(rootView: contentView)
@@ -18,7 +18,7 @@ class FloatingWindowController: NSWindowController {
         } else if let screen = NSScreen.main {
             let sf = screen.visibleFrame
             let margin: CGFloat = 16
-            initialRect.origin.x = sf.maxX - defaultWidth - margin
+            initialRect.origin.x = sf.midX - defaultWidth / 2
             initialRect.origin.y = sf.maxY - defaultHeight - margin
         }
 
