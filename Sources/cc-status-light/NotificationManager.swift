@@ -3,34 +3,21 @@ import AppKit
 
 class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private var isMuted = false
-    private var soundPath: String = "/System/Library/Sounds/Glass.aiff"
+    private var soundName = "Glass"
 
     override init() {
         super.init()
 
         let home = FileManager.default.homeDirectoryForCurrentUser.path
 
-        // Check for custom audio file (takes priority)
-        var customFound = false
-        for ext in ["aiff", "wav", "mp3"] {
-            let path = "\(home)/.claude/cc-status-light/notification.\(ext)"
-            if FileManager.default.fileExists(atPath: path) {
-                soundPath = path
-                customFound = true
-                break
-            }
-        }
-
-        // If no custom file, check for system sound name config
-        if !customFound {
-            let nameFile = "\(home)/.claude/cc-status-light/sound_name"
-            if let name = try? String(contentsOfFile: nameFile, encoding: .utf8) {
-                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    let sysPath = "/System/Library/Sounds/\(trimmed).aiff"
-                    if FileManager.default.fileExists(atPath: sysPath) {
-                        soundPath = sysPath
-                    }
+        // Read user-configured sound name
+        let nameFile = "\(home)/.claude/cc-status-light/sound_name"
+        if let name = try? String(contentsOfFile: nameFile, encoding: .utf8) {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                let sysPath = "/System/Library/Sounds/\(trimmed).aiff"
+                if FileManager.default.fileExists(atPath: sysPath) {
+                    soundName = trimmed
                 }
             }
         }
@@ -51,36 +38,30 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func sendCompletionNotification(for session: SessionInfo) {
         guard !isMuted else { return }
 
-        // Play sound via full file path
-        if let sound = NSSound(contentsOf: URL(fileURLWithPath: soundPath), byReference: false) {
-            sound.play()
-        } else {
-            NSSound.beep()
+        let title = projectName(from: session.cwd) ?? "Claude Code"
+        let body = "Task completed — session \(session.shortId)"
+
+        // Use osascript notification (reliable, no permissions needed, includes sound)
+        DispatchQueue.global(qos: .utility).async {
+            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", script]
+            task.launch()
+            task.waitUntilExit()
         }
 
-        // Try UserNotifications first
+        // Also try UNUserNotifications (silent fallback, won't duplicate osascript)
         let content = UNMutableNotificationContent()
-        content.title = projectName(from: session.cwd) ?? "Claude Code"
-        content.body = "Task completed — session \(session.shortId)"
-        content.sound = .default
-
+        content.title = title
+        content.body = body
+        content.sound = UNNotificationSound.defaultCritical
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
-
-        // Also fire osascript notification as reliable fallback
-        let title = projectName(from: session.cwd) ?? "Claude Code"
-        let body = "Task completed — session \(session.shortId)"
-        DispatchQueue.global(qos: .utility).async {
-            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"Glass\""
-            let task = Process()
-            task.launchPath = "/usr/bin/osascript"
-            task.arguments = ["-e", script]
-            task.launch()
-        }
     }
 
     private func projectName(from cwd: String?) -> String? {
