@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 // MARK: - State types
 
@@ -54,6 +53,10 @@ class StateManager: ObservableObject {
         try? fm.createDirectory(atPath: stateDir, withIntermediateDirectories: true)
     }
 
+    deinit {
+        stopWatching()
+    }
+
     // MARK: - FSEvents
 
     func startWatching() {
@@ -98,8 +101,14 @@ class StateManager: ObservableObject {
     // MARK: - State aggregation
 
     func refresh() {
+        // Always run on main to avoid thread-safety issues with previousStates
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in self?.refresh() }
+            return
+        }
+
         guard let files = try? fm.contentsOfDirectory(atPath: stateDir) else {
-            DispatchQueue.main.async { self.currentState = .idle }
+            currentState = .idle
             return
         }
 
@@ -134,9 +143,10 @@ class StateManager: ObservableObject {
             }
             previousStates[sid] = session.state
         }
-        // Clean stale previousStates entries
+
+        // Clean stale previousStates entries (don't keep empty-key entries)
         let activeIds = Set(sessions.map(\.session_id))
-        previousStates = previousStates.filter { activeIds.contains($0.key) || $0.key.isEmpty }
+        previousStates = previousStates.filter { activeIds.contains($0.key) }
 
         // Aggregate: yellow > red > green
         let agg: LightState
@@ -148,16 +158,12 @@ class StateManager: ObservableObject {
             agg = .idle
         }
 
-        DispatchQueue.main.async {
-            self.currentState = agg
-            self.activeSessions = sessions.sorted { $0.state.priority > $1.state.priority }
-        }
+        currentState = agg
+        activeSessions = sessions.sorted { $0.state.priority > $1.state.priority }
 
-        // Fire completion notifications (outside of main queue if needed)
+        // Fire completion callbacks synchronously after state update
         for info in completed {
-            DispatchQueue.main.async {
-                self.onSessionCompleted?(info)
-            }
+            onSessionCompleted?(info)
         }
     }
 }
