@@ -94,7 +94,6 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func activateReturnApp(for session: SessionInfo? = nil) {
-        // Determine which app to activate based on session's terminal
         let bundleID: String
         if let tp = session?.termProgram, !tp.isEmpty {
             switch tp {
@@ -110,19 +109,28 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         } else if !returnApp.isEmpty {
             bundleID = returnApp
         } else {
-            // No session info: try Terminal first, then VSCode
             let defaults = ["com.apple.Terminal", "com.microsoft.VSCode", "com.googlecode.iterm2"]
             for bid in defaults {
-                guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bid).first else { continue }
-                app.activate()
-                return
+                if activateApp(bundleID: bid) { return }
             }
             return
         }
+        activateApp(bundleID: bundleID)
+    }
 
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
-            app.activate()
+    @discardableResult
+    private func activateApp(bundleID: String) -> Bool {
+        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else {
+            return false
         }
+        app.unhide()
+        app.activate()
+        // AppleScript reopen: un-minimizes windows
+        let task = Process()
+        task.launchPath = "/usr/bin/osascript"
+        task.arguments = ["-e", "tell application id \"\(bundleID)\" to reopen"]
+        task.launch()
+        return true
     }
 
     private func openInApp(cwd: String) {
