@@ -6,6 +6,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private var soundName = "Glass"
     private var pendingCWDs: [String: String] = [:]
     private let lock = NSLock()
+    private var returnApp: String = ""
 
     override init() {
         super.init()
@@ -22,6 +23,12 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                     soundName = trimmed
                 }
             }
+        }
+
+        // Read user-configured return app
+        let appFile = "\(home)/.claude/cc-status-light/return_app"
+        if let app = try? String(contentsOfFile: appFile, encoding: .utf8) {
+            returnApp = app.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         let center = UNUserNotificationCenter.current()
@@ -87,6 +94,47 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         return isMuted
     }
 
+    private func openInApp(cwd: String) {
+        let apps = candidateApps()
+        for app in apps {
+            if NSWorkspace.shared.urlForApplication(withBundleIdentifier: app) != nil {
+                // Open directory in this app
+                let task = Process()
+                task.launchPath = "/usr/bin/open"
+                task.arguments = ["-a", app, cwd]
+                task.launch()
+                return
+            }
+        }
+        // Fallback: open Finder
+        NSWorkspace.shared.open(URL(fileURLWithPath: cwd))
+    }
+
+    private func candidateApps() -> [String] {
+        if !returnApp.isEmpty {
+            // Try bundle ID first, then app name
+            let bundleIds = [
+                "com.microsoft.VSCode": "Visual Studio Code",
+                "com.googlecode.iterm2": "iTerm",
+                "com.apple.Terminal": "Terminal",
+                "dev.warp.Warp-Stable": "Warp",
+            ]
+            if let name = bundleIds[returnApp] {
+                return [returnApp, name]
+            }
+            for (bid, name) in bundleIds where name == returnApp {
+                return [bid, name]
+            }
+            return [returnApp]
+        }
+        // Default: VSCode → Terminal → iTerm → Finder
+        return [
+            "com.microsoft.VSCode",
+            "com.apple.Terminal",
+            "com.googlecode.iterm2",
+        ]
+    }
+
     // MARK: - UNUserNotificationCenterDelegate
 
     func userNotificationCenter(
@@ -107,8 +155,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             ?? pendingCWDs[id]
 
         if let cwd {
-            // Open project directory in Finder
-            NSWorkspace.shared.open(URL(fileURLWithPath: cwd))
+            openInApp(cwd: cwd)
         }
 
         // Clean up
