@@ -125,11 +125,6 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
         app.unhide()
         app.activate()
-        // AppleScript reopen: un-minimizes windows
-        let task = Process()
-        task.launchPath = "/usr/bin/osascript"
-        task.arguments = ["-e", "tell application id \"\(bundleID)\" to reopen"]
-        task.launch()
         return true
     }
 
