@@ -76,7 +76,7 @@ struct LightCircle: View {
         .frame(width: 24, height: 24)
         .animation(nil, value: isActive)
         .onAppear { syncBreathing() }
-        .onChange(of: isActive) { _ in syncBreathing() }
+        .onChange(of: isActive, initial: false) { _, _ in syncBreathing() }
         .onDisappear { timer?.invalidate() }
     }
 
