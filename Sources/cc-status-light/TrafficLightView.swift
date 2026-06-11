@@ -50,18 +50,22 @@ struct LightCircle: View {
         let activeColor = lightColors[color] ?? color
 
         ZStack {
-            // Outer glow
-            Circle()
-                .fill(activeColor)
-                .frame(width: 24, height: 24)
-                .blur(radius: isActive ? 6 : 0)
-                .opacity(isActive ? (breathe ? 0.6 : 0.9) : 0)
+            // Outer glow — only visible when active
+            if isActive {
+                Circle()
+                    .fill(activeColor)
+                    .frame(width: 24, height: 24)
+                    .blur(radius: 6)
+                    .opacity(breathe ? 0.6 : 0.9)
+                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: breathe)
+            }
 
             // Main circle
             Circle()
                 .fill(activeColor)
                 .frame(width: 22, height: 22)
                 .opacity(isActive ? (breathe ? 0.75 : 1.0) : 0.2)
+                .animation(isActive ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true) : nil, value: breathe)
 
             // Inner highlight
             Circle()
@@ -73,15 +77,11 @@ struct LightCircle: View {
         .frame(width: 24, height: 24)
         .onAppear {
             if isActive {
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                    breathe = true
-                }
+                breathe = true
             }
         }
-        .onChange(of: isActive, initial: false) { _, newValue in
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                breathe = newValue
-            }
+        .onChange(of: isActive) { _, newValue in
+            breathe = newValue
         }
     }
 }
