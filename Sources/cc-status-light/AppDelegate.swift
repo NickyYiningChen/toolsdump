@@ -29,6 +29,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stateManager.startWatching()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // User clicked notification — forward activation to their terminal/VSCode
+        notificationManager.activateReturnApp()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         stateManager.stopWatching()
     }

@@ -64,10 +64,21 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             lock.unlock()
         }
 
+        // osascript: reliable notification + sound
+        DispatchQueue.global(qos: .utility).async {
+            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", script]
+            task.launch()
+            task.waitUntilExit()
+        }
+
+        // UNUserNotification: click handling
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = UNNotificationSound.defaultCritical
+        content.sound = .default
         content.userInfo = cwd.map { ["cwd": $0] } ?? [:]
         UNUserNotificationCenter.current().add(UNNotificationRequest(
             identifier: id,
@@ -80,6 +91,21 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func toggleMute() -> Bool {
         isMuted.toggle()
         return isMuted
+    }
+
+    func activateReturnApp() {
+        let bundleIDs: [String]
+        if !returnApp.isEmpty {
+            bundleIDs = [returnApp]
+        } else {
+            bundleIDs = ["com.apple.Terminal", "com.microsoft.VSCode", "com.googlecode.iterm2"]
+        }
+
+        for bid in bundleIDs {
+            guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bid).first else { continue }
+            app.activate()
+            return
+        }
     }
 
     private func openInApp(cwd: String) {
