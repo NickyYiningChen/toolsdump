@@ -93,18 +93,35 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         return isMuted
     }
 
-    func activateReturnApp() {
-        let bundleIDs: [String]
-        if !returnApp.isEmpty {
-            bundleIDs = [returnApp]
+    func activateReturnApp(for session: SessionInfo? = nil) {
+        // Determine which app to activate based on session's terminal
+        let bundleID: String
+        if let tp = session?.termProgram, !tp.isEmpty {
+            switch tp {
+            case "Apple_Terminal":
+                bundleID = "com.apple.Terminal"
+            case "iTerm.app":
+                bundleID = "com.googlecode.iterm2"
+            case "vscode", "code", "Code":
+                bundleID = "com.microsoft.VSCode"
+            default:
+                bundleID = "com.apple.Terminal"
+            }
+        } else if !returnApp.isEmpty {
+            bundleID = returnApp
         } else {
-            bundleIDs = ["com.apple.Terminal", "com.microsoft.VSCode", "com.googlecode.iterm2"]
+            // No session info: try Terminal first, then VSCode
+            let defaults = ["com.apple.Terminal", "com.microsoft.VSCode", "com.googlecode.iterm2"]
+            for bid in defaults {
+                guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bid).first else { continue }
+                app.activate()
+                return
+            }
+            return
         }
 
-        for bid in bundleIDs {
-            guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bid).first else { continue }
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
             app.activate()
-            return
         }
     }
 

@@ -19,6 +19,7 @@ struct SessionState: Codable, Equatable {
     let session_id: String
     let ts: Int
     var cwd: String?
+    var term_program: String?
 
     var shortId: String { String(session_id.prefix(8)) }
 
@@ -32,6 +33,7 @@ struct SessionInfo {
     let shortId: String
     let cwd: String?
     var duration: String?
+    var termProgram: String?
 }
 
 // MARK: - StateManager
@@ -166,7 +168,8 @@ class StateManager: ObservableObject {
                 sessionId: last.session_id,
                 shortId: last.shortId,
                 cwd: last.cwd,
-                duration: dur
+                duration: dur,
+                termProgram: last.term_program
             ))
         }
 
@@ -176,7 +179,8 @@ class StateManager: ObservableObject {
             onWaitingForInput?(SessionInfo(
                 sessionId: waiting.session_id,
                 shortId: waiting.shortId,
-                cwd: waiting.cwd
+                cwd: waiting.cwd,
+                termProgram: waiting.term_program
             ))
         }
 

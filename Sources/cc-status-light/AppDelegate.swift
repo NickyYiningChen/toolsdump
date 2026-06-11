@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var stateManager: StateManager!
     var windowController: FloatingWindowController!
     var notificationManager: NotificationManager!
+    private var latestSession: SessionInfo?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Register as login item on first launch
@@ -15,25 +16,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         notificationManager = NotificationManager()
 
         let contentView = TrafficLightView(stateManager: stateManager) { [weak self] in
-            self?.notificationManager.activateReturnApp()
+            self?.notificationManager.activateReturnApp(for: self?.latestSession)
         }
         windowController = FloatingWindowController(contentView: contentView)
         windowController.showWindow(nil)
 
         // Wire state changes to notifications
         stateManager.onSessionCompleted = { [weak self] info in
+            self?.latestSession = info
             self?.notificationManager.sendCompletionNotification(for: info)
         }
         stateManager.onWaitingForInput = { [weak self] info in
+            self?.latestSession = info
             self?.notificationManager.sendWaitingNotification(for: info)
         }
 
         stateManager.startWatching()
-    }
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        // User clicked notification — forward activation to their terminal/VSCode
-        notificationManager.activateReturnApp()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
