@@ -58,24 +58,12 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private func fireNotification(title: String, body: String, cwd: String?) {
         let id = UUID().uuidString
 
-        // Store cwd for click-to-open
         if let cwd {
             lock.lock()
             pendingCWDs[id] = cwd
             lock.unlock()
         }
 
-        // osascript notification (reliable, includes sound)
-        DispatchQueue.global(qos: .utility).async {
-            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
-            let task = Process()
-            task.launchPath = "/usr/bin/osascript"
-            task.arguments = ["-e", script]
-            task.launch()
-            task.waitUntilExit()
-        }
-
-        // UNUserNotification (supports click action)
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
