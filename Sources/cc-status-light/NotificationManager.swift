@@ -102,7 +102,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 bundleID = "com.apple.Terminal"
             case "iTerm.app":
                 bundleID = "com.googlecode.iterm2"
-            case "vscode", "code", "Code":
+            case "vscode", "code", "Code", "com.microsoft.VSCode":
                 bundleID = "com.microsoft.VSCode"
             default:
                 bundleID = "com.apple.Terminal"

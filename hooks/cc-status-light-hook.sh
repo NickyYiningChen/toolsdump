@@ -12,7 +12,7 @@ mkdir -p "$STATE_DIR"
 
 # Delegate all logic to a single Python invocation — no shell interpolation into code.
 # Shell variables are passed via environment to avoid injection.
-export STATE_DIR STATE TERM_PROGRAM
+export STATE_DIR STATE
 
 # Pass stdin through to Python (Python reads hook JSON from sys.stdin)
 exec python3 -c '
@@ -20,7 +20,19 @@ import json, os, sys, time
 
 state_dir = os.environ["STATE_DIR"]
 state = os.environ["STATE"]
+
+# Detect which app this session is from
 term_program = os.environ.get("TERM_PROGRAM", "")
+# VSCode detection: check VSCODE_* env vars
+if not term_program:
+    for key in os.environ:
+        if key.startswith("VSCODE_") or key.startswith("CODE_"):
+            term_program = "vscode"
+            break
+# iTerm detection
+if not term_program:
+    if os.environ.get("ITERM_SESSION_ID"):
+        term_program = "iTerm.app"
 
 # Read hook JSON from stdin (if piped)
 session_id = ""
