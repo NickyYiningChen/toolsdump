@@ -95,31 +95,22 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func openInApp(cwd: String) {
-        // Activate the preferred app (bring it to front)
-        let apps = candidateApps()
-        for app in apps {
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app) {
-                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
-                return
-            }
+        // Default app names to try, in order
+        let names: [String]
+        if !returnApp.isEmpty {
+            names = [returnApp]
+        } else {
+            names = ["Visual Studio Code", "Terminal", "iTerm"]
         }
-        // Fallback: activate via app name
-        let fallbackNames = ["Visual Studio Code", "Terminal", "iTerm"]
-        for name in fallbackNames {
+
+        for name in names {
             let task = Process()
-            task.launchPath = "/usr/bin/osascript"
-            task.arguments = ["-e", "tell application \"\(name)\" to activate"]
+            task.launchPath = "/usr/bin/open"
+            task.arguments = ["-a", name]
             task.launch()
             task.waitUntilExit()
             if task.terminationStatus == 0 { return }
         }
-    }
-
-    private func candidateApps() -> [String] {
-        if !returnApp.isEmpty {
-            return [returnApp]
-        }
-        return ["com.microsoft.VSCode", "com.apple.Terminal", "com.googlecode.iterm2"]
     }
 
     // MARK: - UNUserNotificationCenterDelegate
