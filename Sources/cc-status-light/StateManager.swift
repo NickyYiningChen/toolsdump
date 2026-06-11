@@ -40,6 +40,7 @@ class StateManager: ObservableObject {
     @Published var activeSessions: [SessionState] = []
 
     var onSessionCompleted: ((SessionInfo) -> Void)?
+    var onWaitingForInput: ((SessionInfo) -> Void)?
 
     private let stateDir: String
     private var eventStream: FSEventStreamRef?
@@ -159,6 +160,17 @@ class StateManager: ObservableObject {
                 cwd: last.cwd
             ))
         }
+
+        // Fire waiting notification when any session needs input
+        if previousAggregate != .waiting && agg == .waiting,
+           let waiting = sessions.first(where: { $0.state == .waiting }) {
+            onWaitingForInput?(SessionInfo(
+                sessionId: waiting.session_id,
+                shortId: waiting.shortId,
+                cwd: waiting.cwd
+            ))
+        }
+
         previousAggregate = agg
     }
 }

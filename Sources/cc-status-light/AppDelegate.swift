@@ -22,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stateManager.onSessionCompleted = { [weak self] info in
             self?.notificationManager.sendCompletionNotification(for: info)
         }
+        stateManager.onWaitingForInput = { [weak self] info in
+            self?.notificationManager.sendWaitingNotification(for: info)
+        }
 
         stateManager.startWatching()
     }

@@ -35,6 +35,32 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    func sendWaitingNotification(for session: SessionInfo) {
+        guard !isMuted else { return }
+
+        let title = projectName(from: session.cwd) ?? "Claude Code"
+        let body = "Waiting for your input — session \(session.shortId)"
+
+        DispatchQueue.global(qos: .utility).async {
+            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", script]
+            task.launch()
+            task.waitUntilExit()
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = UNNotificationSound.defaultCritical
+        UNUserNotificationCenter.current().add(UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        ))
+    }
+
     func sendCompletionNotification(for session: SessionInfo) {
         guard !isMuted else { return }
 
