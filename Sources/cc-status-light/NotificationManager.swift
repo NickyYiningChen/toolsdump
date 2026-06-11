@@ -39,8 +39,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         guard !isMuted else { return }
 
         let title = "Help me!!"
-        let project = projectName(from: session.cwd)
-        let body = project != nil ? "\(project!) needs your input" : "Waiting for your input"
+        let body = "Needs your input."
 
         fireNotification(title: title, body: body)
     }
@@ -49,11 +48,8 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         guard !isMuted else { return }
 
         let title = "Let's rock!!"
-        let project = projectName(from: session.cwd) ?? ""
         let dur = session.duration.map { " (\($0))" } ?? ""
-        let body = project.isEmpty
-            ? "All tasks completed\(dur)"
-            : "\(project) done\(dur)"
+        let body = "Done\(dur)"
 
         fireNotification(title: title, body: body)
     }
