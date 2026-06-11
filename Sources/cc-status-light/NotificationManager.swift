@@ -4,6 +4,8 @@ import AppKit
 class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private var isMuted = false
     private var soundName = "Glass"
+    private var pendingCWDs: [String: String] = [:]
+    private let lock = NSLock()
 
     override init() {
         super.init()
@@ -37,24 +39,26 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     func sendWaitingNotification(for session: SessionInfo) {
         guard !isMuted else { return }
-
-        let title = "Help me!!"
-        let body = "Needs your input."
-
-        fireNotification(title: title, body: body)
+        fireNotification(title: "Help me!!", body: "Needs your input.", cwd: session.cwd)
     }
 
     func sendCompletionNotification(for session: SessionInfo) {
         guard !isMuted else { return }
-
-        let title = "Let's rock!!"
         let dur = session.duration.map { " (\($0))" } ?? ""
-        let body = "Done\(dur)"
-
-        fireNotification(title: title, body: body)
+        fireNotification(title: "Let's rock!!", body: "Done\(dur)", cwd: session.cwd)
     }
 
-    private func fireNotification(title: String, body: String) {
+    private func fireNotification(title: String, body: String, cwd: String?) {
+        let id = UUID().uuidString
+
+        // Store cwd for click-to-open
+        if let cwd {
+            lock.lock()
+            pendingCWDs[id] = cwd
+            lock.unlock()
+        }
+
+        // osascript notification (reliable, includes sound)
         DispatchQueue.global(qos: .utility).async {
             let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
             let task = Process()
@@ -64,20 +68,17 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             task.waitUntilExit()
         }
 
+        // UNUserNotification (supports click action)
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = UNNotificationSound.defaultCritical
+        content.userInfo = cwd.map { ["cwd": $0] } ?? [:]
         UNUserNotificationCenter.current().add(UNNotificationRequest(
-            identifier: UUID().uuidString,
+            identifier: id,
             content: content,
             trigger: nil
         ))
-    }
-
-    private func projectName(from cwd: String?) -> String? {
-        guard let cwd else { return nil }
-        return URL(fileURLWithPath: cwd).lastPathComponent
     }
 
     @discardableResult
@@ -94,5 +95,27 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let id = response.notification.request.identifier
+        let cwd = response.notification.request.content.userInfo["cwd"] as? String
+            ?? pendingCWDs[id]
+
+        if let cwd {
+            // Open project directory in Finder
+            NSWorkspace.shared.open(URL(fileURLWithPath: cwd))
+        }
+
+        // Clean up
+        lock.lock()
+        pendingCWDs.removeValue(forKey: id)
+        lock.unlock()
+
+        completionHandler()
     }
 }
