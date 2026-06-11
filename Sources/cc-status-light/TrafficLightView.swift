@@ -39,6 +39,7 @@ struct LightCircle: View {
     let isActive: Bool
 
     @State private var breathe = false
+    @State private var timer: Timer?
 
     private let lightColors: [Color: Color] = [
         .red:    Color(red: 1.0, green: 0.23, blue: 0.19),
@@ -50,14 +51,13 @@ struct LightCircle: View {
         let activeColor = lightColors[color] ?? color
 
         ZStack {
-            // Outer glow — only visible when active
+            // Outer glow — only when active
             if isActive {
                 Circle()
                     .fill(activeColor)
                     .frame(width: 24, height: 24)
                     .blur(radius: 6)
-                    .opacity(breathe ? 0.6 : 0.9)
-                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: breathe)
+                    .opacity(breathe ? 0.9 : 0.6)
             }
 
             // Main circle
@@ -65,23 +65,34 @@ struct LightCircle: View {
                 .fill(activeColor)
                 .frame(width: 22, height: 22)
                 .opacity(isActive ? (breathe ? 0.75 : 1.0) : 0.2)
-                .animation(isActive ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true) : nil, value: breathe)
 
             // Inner highlight
             Circle()
                 .fill(Color.white)
                 .frame(width: 8, height: 8)
                 .offset(x: -3, y: -3)
-                .opacity(isActive ? (breathe ? 0.15 : 0.3) : 0.05)
+                .opacity(isActive ? (breathe ? 0.3 : 0.15) : 0.05)
         }
         .frame(width: 24, height: 24)
-        .onAppear {
-            if isActive {
-                breathe = true
+        .animation(nil, value: isActive)
+        .onAppear { syncBreathing() }
+        .onChange(of: isActive) { _ in syncBreathing() }
+        .onDisappear { timer?.invalidate() }
+    }
+
+    private func syncBreathing() {
+        timer?.invalidate()
+        if isActive {
+            breathe = true
+            timer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.75)) {
+                    breathe.toggle()
+                }
             }
-        }
-        .onChange(of: isActive) { _, newValue in
-            breathe = newValue
+            timer?.fire()
+        } else {
+            breathe = false
+            timer = nil
         }
     }
 }
