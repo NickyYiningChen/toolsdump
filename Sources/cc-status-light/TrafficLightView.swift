@@ -21,9 +21,13 @@ struct TrafficLightView: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
-        .onTapGesture {
-            onTap?()
-        }
+        .overlay(
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap?()
+                }
+        )
         .contextMenu {
             Button("Mute Notifications") {
                 NotificationCenter.default.post(name: .toggleMute, object: nil)

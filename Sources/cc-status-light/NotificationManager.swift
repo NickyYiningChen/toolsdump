@@ -94,6 +94,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func activateReturnApp(for session: SessionInfo? = nil) {
+        print("cc-status-light: activateReturnApp session=\(session?.shortId ?? "nil") termProgram=\(session?.termProgram ?? "nil")")
         let bundleID: String
         if let tp = session?.termProgram, !tp.isEmpty {
             switch tp {
@@ -120,11 +121,18 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     @discardableResult
     private func activateApp(bundleID: String) -> Bool {
-        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else {
-            return false
+        let appName: String
+        switch bundleID {
+        case "com.apple.Terminal":    appName = "Terminal"
+        case "com.microsoft.VSCode":  appName = "Visual Studio Code"
+        case "com.googlecode.iterm2": appName = "iTerm"
+        default:                      appName = bundleID
         }
-        app.unhide()
-        app.activate()
+
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = ["-a", appName]
+        task.launch()
         return true
     }
 
