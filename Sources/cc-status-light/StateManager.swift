@@ -43,6 +43,7 @@ class StateManager: ObservableObject {
 
     private let stateDir: String
     private var eventStream: FSEventStreamRef?
+    private var previousAggregate: LightState = .idle
     private var previousStates: [String: LightState] = [:]
     private let staleThreshold: TimeInterval = 300
     private let fm = FileManager.default
@@ -128,23 +129,12 @@ class StateManager: ObservableObject {
             sessions.append(session)
         }
 
-        // Detect completions: session went from non-idle to idle
-        var completed: [SessionInfo] = []
+        // Update per-session state tracking
         for session in sessions {
             let sid = session.session_id
             guard !sid.isEmpty else { continue }
-            let prev = previousStates[sid]
-            if session.state == .idle, let prev = prev, prev != .idle {
-                completed.append(SessionInfo(
-                    sessionId: sid,
-                    shortId: session.shortId,
-                    cwd: session.cwd
-                ))
-            }
             previousStates[sid] = session.state
         }
-
-        // Clean stale previousStates entries (don't keep empty-key entries)
         let activeIds = Set(sessions.map(\.session_id))
         previousStates = previousStates.filter { activeIds.contains($0.key) }
 
@@ -161,9 +151,14 @@ class StateManager: ObservableObject {
         currentState = agg
         activeSessions = sessions.sorted { $0.state.priority > $1.state.priority }
 
-        // Fire completion callbacks synchronously after state update
-        for info in completed {
-            onSessionCompleted?(info)
+        // Fire completion only when ALL sessions are done (aggregate → idle)
+        if previousAggregate != .idle && agg == .idle, let last = sessions.first {
+            onSessionCompleted?(SessionInfo(
+                sessionId: last.session_id,
+                shortId: last.shortId,
+                cwd: last.cwd
+            ))
         }
+        previousAggregate = agg
     }
 }
