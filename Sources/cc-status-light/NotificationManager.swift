@@ -3,16 +3,42 @@ import AppKit
 
 class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private var isMuted = false
-    private var customSoundURL: URL?
+    private var soundPath: String = "/System/Library/Sounds/Glass.aiff"
 
     override init() {
         super.init()
+
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        // Check for custom audio file (takes priority)
+        var customFound = false
+        for ext in ["aiff", "wav", "mp3"] {
+            let path = "\(home)/.claude/cc-status-light/notification.\(ext)"
+            if FileManager.default.fileExists(atPath: path) {
+                soundPath = path
+                customFound = true
+                break
+            }
+        }
+
+        // If no custom file, check for system sound name config
+        if !customFound {
+            let nameFile = "\(home)/.claude/cc-status-light/sound_name"
+            if let name = try? String(contentsOfFile: nameFile, encoding: .utf8) {
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    let sysPath = "/System/Library/Sounds/\(trimmed).aiff"
+                    if FileManager.default.fileExists(atPath: sysPath) {
+                        soundPath = sysPath
+                    }
+                }
+            }
+        }
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
 
-        // Listen for mute toggle from context menu
         NotificationCenter.default.addObserver(
             forName: .toggleMute,
             object: nil,
@@ -20,37 +46,19 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         ) { [weak self] _ in
             self?.toggleMute()
         }
-
-        // Check for custom sound file
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        for ext in ["aiff", "wav", "mp3"] {
-            let path = "\(home)/.claude/cc-status-light/notification.\(ext)"
-            if FileManager.default.fileExists(atPath: path) {
-                customSoundURL = URL(fileURLWithPath: path)
-                break
-            }
-        }
-
-        // Also check bundled default sound
-        if customSoundURL == nil {
-            if let bundled = Bundle.main.url(forResource: "notification", withExtension: "aiff") {
-                customSoundURL = bundled
-            }
-        }
     }
 
     func sendCompletionNotification(for session: SessionInfo) {
         guard !isMuted else { return }
 
-        // Play sound via NSSound (works even if notification permission denied)
-        if let url = customSoundURL {
-            let sound = NSSound(contentsOf: url, byReference: false)
-            sound?.play()
+        // Play sound via full file path
+        if let sound = NSSound(contentsOf: URL(fileURLWithPath: soundPath), byReference: false) {
+            sound.play()
         } else {
             NSSound.beep()
         }
 
-        // Send system notification
+        // Try UserNotifications first
         let content = UNMutableNotificationContent()
         content.title = projectName(from: session.cwd) ?? "Claude Code"
         content.body = "Task completed — session \(session.shortId)"
@@ -62,6 +70,17 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
+
+        // Also fire osascript notification as reliable fallback
+        let title = projectName(from: session.cwd) ?? "Claude Code"
+        let body = "Task completed — session \(session.shortId)"
+        DispatchQueue.global(qos: .utility).async {
+            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"Glass\""
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", script]
+            task.launch()
+        }
     }
 
     private func projectName(from cwd: String?) -> String? {
