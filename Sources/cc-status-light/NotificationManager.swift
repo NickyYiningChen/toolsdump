@@ -95,44 +95,31 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func openInApp(cwd: String) {
+        // Activate the preferred app (bring it to front)
         let apps = candidateApps()
         for app in apps {
-            if NSWorkspace.shared.urlForApplication(withBundleIdentifier: app) != nil {
-                // Open directory in this app
-                let task = Process()
-                task.launchPath = "/usr/bin/open"
-                task.arguments = ["-a", app, cwd]
-                task.launch()
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app) {
+                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
                 return
             }
         }
-        // Fallback: open Finder
-        NSWorkspace.shared.open(URL(fileURLWithPath: cwd))
+        // Fallback: activate via app name
+        let fallbackNames = ["Visual Studio Code", "Terminal", "iTerm"]
+        for name in fallbackNames {
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", "tell application \"\(name)\" to activate"]
+            task.launch()
+            task.waitUntilExit()
+            if task.terminationStatus == 0 { return }
+        }
     }
 
     private func candidateApps() -> [String] {
         if !returnApp.isEmpty {
-            // Try bundle ID first, then app name
-            let bundleIds = [
-                "com.microsoft.VSCode": "Visual Studio Code",
-                "com.googlecode.iterm2": "iTerm",
-                "com.apple.Terminal": "Terminal",
-                "dev.warp.Warp-Stable": "Warp",
-            ]
-            if let name = bundleIds[returnApp] {
-                return [returnApp, name]
-            }
-            for (bid, name) in bundleIds where name == returnApp {
-                return [bid, name]
-            }
             return [returnApp]
         }
-        // Default: VSCode → Terminal → iTerm → Finder
-        return [
-            "com.microsoft.VSCode",
-            "com.apple.Terminal",
-            "com.googlecode.iterm2",
-        ]
+        return ["com.microsoft.VSCode", "com.apple.Terminal", "com.googlecode.iterm2"]
     }
 
     // MARK: - UNUserNotificationCenterDelegate
