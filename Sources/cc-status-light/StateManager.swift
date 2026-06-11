@@ -31,6 +31,7 @@ struct SessionInfo {
     let sessionId: String
     let shortId: String
     let cwd: String?
+    var duration: String?
 }
 
 // MARK: - StateManager
@@ -46,6 +47,7 @@ class StateManager: ObservableObject {
     private var eventStream: FSEventStreamRef?
     private var previousAggregate: LightState = .idle
     private var previousStates: [String: LightState] = [:]
+    private var sessionStartTimes: [String: Date] = [:]
     private let staleThreshold: TimeInterval = 300
     private let fm = FileManager.default
 
@@ -134,10 +136,15 @@ class StateManager: ObservableObject {
         for session in sessions {
             let sid = session.session_id
             guard !sid.isEmpty else { continue }
+            // Record start time when session first appears
+            if previousStates[sid] == nil {
+                sessionStartTimes[sid] = Date()
+            }
             previousStates[sid] = session.state
         }
         let activeIds = Set(sessions.map(\.session_id))
         previousStates = previousStates.filter { activeIds.contains($0.key) }
+        sessionStartTimes = sessionStartTimes.filter { activeIds.contains($0.key) }
 
         // Aggregate: yellow > red > green
         let agg: LightState
@@ -154,10 +161,12 @@ class StateManager: ObservableObject {
 
         // Fire completion only when ALL sessions are done (aggregate → idle)
         if previousAggregate != .idle && agg == .idle, let last = sessions.first {
+            let dur = formatDuration(from: sessionStartTimes[last.session_id])
             onSessionCompleted?(SessionInfo(
                 sessionId: last.session_id,
                 shortId: last.shortId,
-                cwd: last.cwd
+                cwd: last.cwd,
+                duration: dur
             ))
         }
 
@@ -172,5 +181,17 @@ class StateManager: ObservableObject {
         }
 
         previousAggregate = agg
+    }
+
+    private func formatDuration(from start: Date?) -> String? {
+        guard let start else { return nil }
+        let seconds = Int(Date().timeIntervalSince(start))
+        if seconds < 60 { return "\(seconds)s" }
+        let m = seconds / 60
+        let s = seconds % 60
+        if seconds < 3600 { return s > 0 ? "\(m)m\(s)s" : "\(m)m" }
+        let h = m / 60
+        let rm = m % 60
+        return rm > 0 ? "\(h)h\(rm)m" : "\(h)h"
     }
 }

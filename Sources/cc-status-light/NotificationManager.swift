@@ -38,9 +38,27 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func sendWaitingNotification(for session: SessionInfo) {
         guard !isMuted else { return }
 
-        let title = projectName(from: session.cwd) ?? "Claude Code"
-        let body = "Waiting for your input — session \(session.shortId)"
+        let title = "Help me!!"
+        let project = projectName(from: session.cwd)
+        let body = project != nil ? "\(project!) needs your input" : "Waiting for your input"
 
+        fireNotification(title: title, body: body)
+    }
+
+    func sendCompletionNotification(for session: SessionInfo) {
+        guard !isMuted else { return }
+
+        let title = "Let's rock!!"
+        let project = projectName(from: session.cwd) ?? ""
+        let dur = session.duration.map { " (\($0))" } ?? ""
+        let body = project.isEmpty
+            ? "All tasks completed\(dur)"
+            : "\(project) done\(dur)"
+
+        fireNotification(title: title, body: body)
+    }
+
+    private func fireNotification(title: String, body: String) {
         DispatchQueue.global(qos: .utility).async {
             let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
             let task = Process()
@@ -59,35 +77,6 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             content: content,
             trigger: nil
         ))
-    }
-
-    func sendCompletionNotification(for session: SessionInfo) {
-        guard !isMuted else { return }
-
-        let title = projectName(from: session.cwd) ?? "Claude Code"
-        let body = "Task completed — session \(session.shortId)"
-
-        // Use osascript notification (reliable, no permissions needed, includes sound)
-        DispatchQueue.global(qos: .utility).async {
-            let script = "display notification \"\(body)\" with title \"\(title)\" sound name \"\(self.soundName)\""
-            let task = Process()
-            task.launchPath = "/usr/bin/osascript"
-            task.arguments = ["-e", script]
-            task.launch()
-            task.waitUntilExit()
-        }
-
-        // Also try UNUserNotifications (silent fallback, won't duplicate osascript)
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = UNNotificationSound.defaultCritical
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
     }
 
     private func projectName(from cwd: String?) -> String? {
