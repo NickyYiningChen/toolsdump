@@ -10,38 +10,51 @@ STATE="${1:-idle}"
 
 mkdir -p "$STATE_DIR"
 
-# Read all stdin (hook JSON from Claude Code)
-SESSION_ID=""
-CWD=""
-if [ ! -t 0 ]; then
-    INPUT=$(cat)
-    if [ -n "$INPUT" ]; then
-        SESSION_ID=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null || true)
-        CWD=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('cwd',''))" 2>/dev/null || true)
-    fi
-fi
+# Delegate all logic to a single Python invocation — no shell interpolation into code.
+# Shell variables are passed via environment to avoid injection.
+export STATE_DIR STATE
+
+# Pass stdin through to Python (Python reads hook JSON from sys.stdin)
+exec python3 -c '
+import json, os, sys, time
+
+state_dir = os.environ["STATE_DIR"]
+state = os.environ["STATE"]
+
+# Read hook JSON from stdin (if piped)
+session_id = ""
+cwd = ""
+if not sys.stdin.isatty():
+    raw = sys.stdin.read().strip()
+    if raw:
+        try:
+            data = json.loads(raw)
+            session_id = data.get("session_id", "")
+            cwd = data.get("cwd", "")
+        except json.JSONDecodeError:
+            pass
 
 # Determine target file
-if [ -n "$SESSION_ID" ]; then
-    FILE="$STATE_DIR/${SESSION_ID}.json"
-else
-    FILE="$STATE_DIR/_default.json"
-fi
+if session_id:
+    filepath = f"{state_dir}/{session_id}.json"
+else:
+    filepath = f"{state_dir}/_default.json"
 
 # Preserve existing cwd if not in current input
-if [ -z "$CWD" ] && [ -f "$FILE" ]; then
-    CWD=$(python3 -c "import sys,json; print(json.load(open('$FILE')).get('cwd',''))" 2>/dev/null || true)
-fi
+if not cwd:
+    try:
+        with open(filepath) as f:
+            prev = json.load(f)
+            cwd = prev.get("cwd", "")
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
 
 # Write state file
-python3 -c "
-import json, time
-data = {
-    'state': '${STATE}',
-    'session_id': '${SESSION_ID}',
-    'ts': int(time.time()),
-    'cwd': '${CWD}'
-}
-with open('${FILE}', 'w') as f:
-    json.dump(data, f)
-"
+with open(filepath, "w") as f:
+    json.dump({
+        "state": state,
+        "session_id": session_id,
+        "ts": int(time.time()),
+        "cwd": cwd,
+    }, f)
+'
