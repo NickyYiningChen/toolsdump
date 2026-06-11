@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TrafficLightView: View {
     @ObservedObject var stateManager: StateManager
+    var onTap: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -20,6 +21,9 @@ struct TrafficLightView: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+        .onTapGesture {
+            onTap?()
+        }
         .contextMenu {
             Button("Mute Notifications") {
                 NotificationCenter.default.post(name: .toggleMute, object: nil)

@@ -14,7 +14,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stateManager = StateManager()
         notificationManager = NotificationManager()
 
-        let contentView = TrafficLightView(stateManager: stateManager)
+        let contentView = TrafficLightView(stateManager: stateManager) { [weak self] in
+            self?.notificationManager.activateReturnApp()
+        }
         windowController = FloatingWindowController(contentView: contentView)
         windowController.showWindow(nil)
 
