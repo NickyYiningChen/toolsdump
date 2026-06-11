@@ -44,6 +44,7 @@ class StateManager: ObservableObject {
 
     var onSessionCompleted: ((SessionInfo) -> Void)?
     var onWaitingForInput: ((SessionInfo) -> Void)?
+    var onAnySessionChange: ((SessionInfo) -> Void)?
 
     private let stateDir: String
     private var eventStream: FSEventStreamRef?
@@ -141,6 +142,16 @@ class StateManager: ObservableObject {
             // Record start time when session first appears
             if previousStates[sid] == nil {
                 sessionStartTimes[sid] = Date()
+            }
+            // Fire onAnySessionChange for every state transition
+            let prev = previousStates[sid]
+            if prev != session.state {
+                onAnySessionChange?(SessionInfo(
+                    sessionId: sid,
+                    shortId: session.shortId,
+                    cwd: session.cwd,
+                    termProgram: session.term_program
+                ))
             }
             previousStates[sid] = session.state
         }

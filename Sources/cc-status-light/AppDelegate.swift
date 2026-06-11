@@ -22,12 +22,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController.showWindow(nil)
 
         // Wire state changes to notifications
-        stateManager.onSessionCompleted = { [weak self] info in
+        stateManager.onAnySessionChange = { [weak self] info in
             self?.latestSession = info
+        }
+        stateManager.onSessionCompleted = { [weak self] info in
             self?.notificationManager.sendCompletionNotification(for: info)
         }
         stateManager.onWaitingForInput = { [weak self] info in
-            self?.latestSession = info
             self?.notificationManager.sendWaitingNotification(for: info)
         }
 
