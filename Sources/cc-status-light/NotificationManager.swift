@@ -105,7 +105,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
         for bid in bundleIDs {
             guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bid).first else { continue }
-            app.activate(options: .activateIgnoringOtherApps)
+            app.activate()
             return
         }
     }
