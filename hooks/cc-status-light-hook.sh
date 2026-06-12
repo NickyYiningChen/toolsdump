@@ -37,6 +37,7 @@ if not term_program:
 # Read hook JSON from stdin (if piped)
 session_id = ""
 cwd = ""
+tool_name = ""
 if not sys.stdin.isatty():
     raw = sys.stdin.read().strip()
     if raw:
@@ -44,8 +45,45 @@ if not sys.stdin.isatty():
             data = json.loads(raw)
             session_id = data.get("session_id", "")
             cwd = data.get("cwd", "")
+            tool_name = data.get("tool_name", "")
         except json.JSONDecodeError:
             pass
+
+# PreToolUse: if the tool being called requires user interaction,
+# treat it as "waiting" (yellow) instead of "busy" (red).
+# AskUserQuestion blocks until the user responds — so we need the
+# yellow light + notification to fire immediately.
+# Tools that can trigger permission prompts and block waiting for user.
+# When these fire PreToolUse, the light should be yellow (waiting), not red (busy).
+INTERACTIVE_TOOLS = {
+    "AskUserQuestion",
+    "Bash",
+    "Write",
+    "Edit",
+    "WebFetch",
+    "WebSearch",
+    "NotebookEdit",
+    "CronCreate",
+    "CronDelete",
+    "TaskStop",
+    "EnterPlanMode",
+    "ExitPlanMode",
+}
+if state == "busy" and tool_name in INTERACTIVE_TOOLS:
+    state = "waiting"
+
+# On idle (Stop hook), remove all state files to guarantee clean exit.
+# This is more robust than writing an idle file — it handles the case
+# where notification hooks wrote extra "waiting" files that would
+# otherwise keep the light yellow.
+if state == "idle":
+    import glob
+    for f in glob.glob(f"{state_dir}/*.json"):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    sys.exit(0)
 
 # Determine target file
 if session_id:

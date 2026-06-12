@@ -51,7 +51,10 @@ class StateManager: ObservableObject {
     private var previousAggregate: LightState = .idle
     private var previousStates: [String: LightState] = [:]
     private var sessionStartTimes: [String: Date] = [:]
+    private var lastKnownSession: SessionState?
     private let staleThreshold: TimeInterval = 300
+    private let yellowDebounceDelay: TimeInterval = 0.6
+    private var yellowDebounceWorkItem: DispatchWorkItem?
     private let fm = FileManager.default
 
     init() {
@@ -169,32 +172,58 @@ class StateManager: ObservableObject {
             agg = .idle
         }
 
-        currentState = agg
         activeSessions = sessions.sorted { $0.state.priority > $1.state.priority }
 
-        // Fire completion only when ALL sessions are done (aggregate → idle)
-        if previousAggregate != .idle && agg == .idle, let last = sessions.first {
-            let dur = formatDuration(from: sessionStartTimes[last.session_id])
+        // Fire completion only when ALL sessions are done (aggregate → idle).
+        // When sessions are removed via deletion (idle hook), sessions.first is nil,
+        // so we track the last known session to still fire the notification.
+        if previousAggregate != .idle && agg == .idle {
+            let last = sessions.first ?? lastKnownSession
+            let dur = last.flatMap { formatDuration(from: sessionStartTimes[$0.session_id]) }
             onSessionCompleted?(SessionInfo(
-                sessionId: last.session_id,
-                shortId: last.shortId,
-                cwd: last.cwd,
+                sessionId: last?.session_id ?? "",
+                shortId: last?.shortId ?? "",
+                cwd: last?.cwd,
                 duration: dur,
-                termProgram: last.term_program
+                termProgram: last?.term_program
             ))
         }
 
-        // Fire waiting notification when any session needs input
-        if previousAggregate != .waiting && agg == .waiting,
-           let waiting = sessions.first(where: { $0.state == .waiting }) {
-            onWaitingForInput?(SessionInfo(
-                sessionId: waiting.session_id,
-                shortId: waiting.shortId,
-                cwd: waiting.cwd,
-                termProgram: waiting.term_program
-            ))
+        if let s = sessions.first {
+            lastKnownSession = s
         }
 
+        // Debounce yellow: auto-approved tools (Bash, Edit, etc.) resolve in
+        // < 500ms. Delay the waiting state so brief flashes don't trigger
+        // the light, sound, or notification.
+        if agg == .waiting && previousAggregate != .waiting && yellowDebounceWorkItem == nil {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.yellowDebounceWorkItem = nil
+                guard let s = self.activeSessions.first(where: { $0.state == .waiting }) else { return }
+                self.currentState = .waiting
+                self.previousAggregate = .waiting
+                self.onWaitingForInput?(SessionInfo(
+                    sessionId: s.session_id,
+                    shortId: s.shortId,
+                    cwd: s.cwd,
+                    termProgram: s.term_program
+                ))
+            }
+            yellowDebounceWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + yellowDebounceDelay, execute: workItem)
+            return
+        }
+
+        if agg != .waiting {
+            yellowDebounceWorkItem?.cancel()
+            yellowDebounceWorkItem = nil
+        } else {
+            // Already in waiting (debounce fired or previousAggregate was already .waiting)
+            return
+        }
+
+        currentState = agg
         previousAggregate = agg
     }
 
