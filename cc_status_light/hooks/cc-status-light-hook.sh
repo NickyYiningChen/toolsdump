@@ -57,17 +57,6 @@ if not sys.stdin.isatty():
 # When these fire PreToolUse, the light should be yellow (waiting), not red (busy).
 INTERACTIVE_TOOLS = {
     "AskUserQuestion",
-    "Bash",
-    "Write",
-    "Edit",
-    "WebFetch",
-    "WebSearch",
-    "NotebookEdit",
-    "CronCreate",
-    "CronDelete",
-    "TaskStop",
-    "EnterPlanMode",
-    "ExitPlanMode",
 }
 if state == "busy" and tool_name in INTERACTIVE_TOOLS:
     state = "waiting"
