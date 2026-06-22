@@ -2,7 +2,6 @@
 
 A floating traffic-light indicator for Claude Code that lives on your desktop. Know whether Claude is working, waiting, or done — without switching back to the terminal or VSCode.
 
-<img src="docs/traffic-light.png" width="120" alt="Red, yellow, green traffic light" />
 
 ## How It Looks
 
